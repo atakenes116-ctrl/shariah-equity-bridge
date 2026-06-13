@@ -5,34 +5,41 @@ import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { formatMoney } from "@/lib/screening";
 import { toast } from "sonner";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/sme/status")({ component: StatusPage });
 
-function statusLabel(s: string) {
-  return s.replace(/_/g, " ");
-}
+function statusLabel(s: string) { return s.replace(/_/g, " "); }
 
 function StatusPage() {
   const { user } = useAuth();
   const [deals, setDeals] = useState<any[]>([]);
+  const [invByDeal, setInvByDeal] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
   async function load() {
     if (!user) return;
-    const { data } = await supabase.from("deals").select("*").eq("sme_id", user.id).order("created_at", { ascending: false });
-    setDeals(data ?? []); setLoading(false);
+    const { data: ds } = await supabase.from("deals").select("*").eq("sme_id", user.id).order("created_at", { ascending: false });
+    setDeals(ds ?? []);
+    if (ds && ds.length) {
+      const { data: invs } = await supabase.from("investments").select("*").in("deal_id", ds.map((d: any) => d.id)).order("funded_at");
+      const grouped: Record<string, any[]> = {};
+      (invs ?? []).forEach((i: any) => { (grouped[i.deal_id] ||= []).push(i); });
+      setInvByDeal(grouped);
+    }
+    setLoading(false);
   }
   useEffect(() => { load(); }, [user?.id]);
 
-  async function confirmEquity(id: string) {
-    const { error } = await supabase.from("deals").update({ sme_confirmed_equity: true }).eq("id", id);
+  async function confirmEquity(invId: string) {
+    const { error } = await supabase.from("investments").update({ sme_confirmed_equity: true }).eq("id", invId);
     if (error) return toast.error(error.message);
-    const { data: d } = await supabase.from("deals").select("*").eq("id", id).maybeSingle();
-    if (d?.sme_confirmed_equity && d?.investor_confirmed_receipt && d.status === "funds_in_escrow") {
-      await supabase.from("deals").update({ status: "equity_confirmed" }).eq("id", id);
+    const { data: ni } = await supabase.from("investments").select("*").eq("id", invId).maybeSingle();
+    if (ni?.sme_confirmed_equity && ni?.investor_confirmed_receipt && ni.status === "funds_in_escrow") {
+      await supabase.from("investments").update({ status: "equity_confirmed" }).eq("id", invId);
     }
     toast.success("Equity transfer confirmed");
     load();
@@ -50,41 +57,77 @@ function StatusPage() {
         <Card className="p-8 text-center text-muted-foreground">No applications yet. Start by creating one.</Card>
       )}
       <div className="space-y-4">
-        {deals.map((d) => (
-          <Card key={d.id} className="p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-lg">{d.sme_name}</h2>
-                  <Badge variant="outline">{statusLabel(d.status)}</Badge>
-                  {d.shariah_status === "compliant" && d.status === "approved" && (
-                    <Badge className="bg-primary text-primary-foreground">Shariah-compliant</Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Seeking {formatMoney(d.amount_requested)} for {d.equity_offered}% equity · {d.sector} · {d.country}
+        {deals.map((d) => {
+          const raised = Number(d.funded_amount ?? 0);
+          const pct = Math.min(100, Math.round((raised / d.amount_requested) * 100));
+          const invs = invByDeal[d.id] ?? [];
+          const equityAllocated = invs.reduce((s, i) => s + Number(i.equity_percent ?? 0), 0);
+          return (
+            <Card key={d.id} className="p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-lg">{d.sme_name}</h2>
+                    <Badge variant="outline">{statusLabel(d.status)}</Badge>
+                    {d.shariah_status === "compliant" && d.status !== "under_review" && (
+                      <Badge className="bg-primary text-primary-foreground">Shariah-compliant</Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Seeking {formatMoney(d.amount_requested)} for {d.equity_offered}% equity · min ticket {formatMoney(d.min_investment ?? 0)} · {d.sector} · {d.country}
+                  </div>
                 </div>
               </div>
-              {d.status === "funds_in_escrow" && !d.sme_confirmed_equity && (
-                <Button onClick={() => confirmEquity(d.id)}>Mark equity transferred</Button>
+
+              {(d.status === "approved" || d.status === "partially_funded" || d.status === "fully_funded" || d.status === "completed") && (
+                <div className="mt-4 space-y-1.5">
+                  <Progress value={pct} className="h-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{formatMoney(raised)} raised · {pct}%</span>
+                    <span>{equityAllocated.toFixed(2)}% equity allocated</span>
+                  </div>
+                </div>
               )}
-            </div>
-            {d.review_note && <p className="mt-3 text-sm rounded-md bg-muted p-3"><b>Admin note:</b> {d.review_note}</p>}
-            <div className="mt-4">
-              <h3 className="text-sm font-medium mb-2">Screening report</h3>
-              <ul className="space-y-1.5">
-                {(d.flags as any[]).map((f) => (
-                  <li key={f.code} className="flex items-start gap-2 text-sm">
-                    {f.severity === "pass"
-                      ? <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                      : <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />}
-                    <span><b>{f.label}:</b> <span className="text-muted-foreground">{f.detail}</span></span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Card>
-        ))}
+
+              {d.review_note && <p className="mt-3 text-sm rounded-md bg-muted p-3"><b>Admin note:</b> {d.review_note}</p>}
+
+              {invs.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium mb-2">Investors</h3>
+                  <div className="divide-y rounded-md border">
+                    {invs.map((i) => (
+                      <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+                        <div className="text-sm">
+                          <div className="font-medium">{formatMoney(i.amount)} · {Number(i.equity_percent).toFixed(2)}% equity</div>
+                          <div className="text-xs text-muted-foreground">
+                            {statusLabel(i.status)} · receipt {i.investor_confirmed_receipt ? "✓" : "—"} · equity {i.sme_confirmed_equity ? "✓" : "—"}
+                          </div>
+                        </div>
+                        {i.status === "funds_in_escrow" && !i.sme_confirmed_equity && (
+                          <Button size="sm" onClick={() => confirmEquity(i.id)}>Mark equity issued</Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Screening report</h3>
+                <ul className="space-y-1.5">
+                  {(d.flags as any[]).map((f) => (
+                    <li key={f.code} className="flex items-start gap-2 text-sm">
+                      {f.severity === "pass"
+                        ? <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        : <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />}
+                      <span><b>{f.label}:</b> <span className="text-muted-foreground">{f.detail}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

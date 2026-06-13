@@ -5,6 +5,10 @@ import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { formatMoney } from "@/lib/screening";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
@@ -16,31 +20,42 @@ function DealDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [d, setD] = useState<any>(null);
+  const [wallet, setWallet] = useState<number>(0);
+  const [amount, setAmount] = useState<number>(0);
   const [funding, setFunding] = useState(false);
 
   async function load() {
     const { data } = await supabase.from("deals").select("*").eq("id", id).maybeSingle();
     setD(data);
+    if (data) {
+      const remaining = Math.max(0, data.amount_requested - Number(data.funded_amount ?? 0));
+      setAmount(Math.min(remaining, Math.max(data.min_investment ?? 0, remaining)));
+    }
+    if (user) {
+      const { data: p } = await supabase.from("profiles").select("wallet_balance").eq("id", user.id).maybeSingle();
+      setWallet(Number(p?.wallet_balance ?? 0));
+    }
   }
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [id, user?.id]);
 
   async function fund() {
     if (!user || !d) return;
+    const remaining = Math.max(0, d.amount_requested - Number(d.funded_amount ?? 0));
+    if (amount < (d.min_investment ?? 0)) return toast.error(`Minimum ticket is ${formatMoney(d.min_investment)}`);
+    if (amount > remaining) return toast.error(`Only ${formatMoney(remaining)} remaining`);
+    if (amount > wallet) return toast.error("Insufficient wallet balance");
     setFunding(true);
     try {
-      // Lock atomically: only succeed if still approved & unfunded
-      const deadline = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: updated, error } = await supabase.from("deals")
-        .update({ investor_id: user.id, status: "funds_in_escrow", funded_at: new Date().toISOString(), deadline })
-        .eq("id", id).eq("status", "approved").is("investor_id", null)
-        .select().maybeSingle();
+      const { data: inv, error } = await supabase.from("investments").insert({
+        deal_id: id,
+        investor_id: user.id,
+        amount,
+        equity_percent: (amount / d.amount_requested) * d.equity_offered, // trigger overrides, kept for client-side typing
+      }).select().maybeSingle();
       if (error) throw error;
-      if (!updated) { toast.error("This deal is no longer available."); navigate({ to: "/investor" }); return; }
-      // Debit investor wallet
-      const { data: prof } = await supabase.from("profiles").select("wallet_balance").eq("id", user.id).maybeSingle();
-      await supabase.from("profiles").update({ wallet_balance: (prof?.wallet_balance ?? 0) - d.amount_requested }).eq("id", user.id);
+      await supabase.from("profiles").update({ wallet_balance: wallet - amount }).eq("id", user.id);
       toast.success("Funds placed in escrow");
-      navigate({ to: "/investor/room/$id", params: { id } });
+      navigate({ to: "/investor/room/$id", params: { id: inv!.id } });
     } catch (e: any) {
       toast.error(e.message ?? "Funding failed");
     } finally { setFunding(false); }
@@ -48,6 +63,12 @@ function DealDetail() {
 
   if (!d) return <div className="text-sm text-muted-foreground">Loading…</div>;
   const valuation = d.amount_requested / (d.equity_offered / 100);
+  const raised = Number(d.funded_amount ?? 0);
+  const remaining = Math.max(0, d.amount_requested - raised);
+  const pctRaised = Math.round((raised / d.amount_requested) * 100);
+  const minTicket = Number(d.min_investment ?? 0);
+  const myEquity = d.amount_requested > 0 ? (amount / d.amount_requested) * d.equity_offered : 0;
+  const sliderMax = Math.max(minTicket, remaining);
 
   return (
     <div className="space-y-4">
@@ -66,18 +87,25 @@ function DealDetail() {
           <Stat label="Equity" value={`${d.equity_offered}%`} />
           <Stat label="Valuation" value={formatMoney(valuation)} />
         </div>
+        <div className="mt-4 space-y-1.5">
+          <Progress value={Math.min(100, pctRaised)} className="h-2" />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{formatMoney(raised)} raised ({pctRaised}%)</span>
+            <span>{formatMoney(remaining)} remaining</span>
+          </div>
+        </div>
       </Card>
 
       <Card className="p-4 space-y-2">
         <h2 className="font-medium">Terms (musharakah)</h2>
         <p className="text-sm text-muted-foreground">
-          You receive a <b>{d.equity_offered}% equity stake</b> in {d.sme_name}.
-          Returns are profit-and-loss shared in proportion to your equity.
+          You join a partnership in {d.sme_name}, taking a <b>proportional equity stake</b> based on your ticket.
+          Returns are profit-and-loss shared in proportion to equity held.
           This is a true partnership — there is no fixed or guaranteed return.
         </p>
         <ul className="text-sm space-y-1 mt-2">
-          <li>· Capital deployed: {formatMoney(d.amount_requested)}</li>
-          <li>· Equity received: {d.equity_offered}%</li>
+          <li>· Total round: {formatMoney(d.amount_requested)} for {d.equity_offered}% equity</li>
+          <li>· Minimum ticket: {formatMoney(minTicket)}</li>
           <li>· Implied valuation: {formatMoney(valuation)}</li>
           <li>· Platform service fee: 3% on release</li>
         </ul>
@@ -107,9 +135,41 @@ function DealDetail() {
         </div>
       </Card>
 
-      <Button size="lg" className="w-full" disabled={funding} onClick={fund}>
-        {funding ? "Placing funds…" : `Fund ${formatMoney(d.amount_requested)} into escrow`}
-      </Button>
+      <Card className="p-4 space-y-4">
+        <h2 className="font-medium">Your ticket</h2>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Investment amount</Label>
+            <span className="text-xs text-muted-foreground">Wallet: {formatMoney(wallet)}</span>
+          </div>
+          <Input
+            type="number"
+            min={minTicket}
+            max={remaining}
+            value={amount}
+            onChange={(e) => setAmount(+e.target.value)}
+          />
+          {sliderMax > minTicket && (
+            <Slider
+              value={[Math.min(amount, sliderMax)]}
+              min={minTicket}
+              max={sliderMax}
+              step={Math.max(1, Math.round(minTicket / 10))}
+              onValueChange={(v) => setAmount(v[0])}
+            />
+          )}
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <Stat label="You pay" value={formatMoney(amount)} />
+            <Stat label="Equity you receive" value={`${myEquity.toFixed(2)}%`} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Min {formatMoney(minTicket)} · Max remaining {formatMoney(remaining)}.
+          </p>
+        </div>
+        <Button size="lg" className="w-full" disabled={funding || amount < minTicket || amount > remaining || amount > wallet} onClick={fund}>
+          {funding ? "Placing funds…" : `Fund ${formatMoney(amount)} into escrow`}
+        </Button>
+      </Card>
     </div>
   );
 }

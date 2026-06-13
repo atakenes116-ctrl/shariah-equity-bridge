@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { formatMoney } from "@/lib/screening";
 import { ChevronRight } from "lucide-react";
 
@@ -12,7 +13,8 @@ function Marketplace() {
   const [deals, setDeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    supabase.from("deals").select("*").eq("status", "approved").is("investor_id", null)
+    supabase.from("deals").select("*")
+      .in("status", ["approved", "partially_funded"])
       .order("created_at", { ascending: false })
       .then(({ data }) => { setDeals(data ?? []); setLoading(false); });
   }, []);
@@ -29,6 +31,9 @@ function Marketplace() {
       )}
       {deals.map((d) => {
         const valuation = d.amount_requested / (d.equity_offered / 100);
+        const raised = Number(d.funded_amount ?? 0);
+        const pct = Math.min(100, Math.round((raised / d.amount_requested) * 100));
+        const remaining = Math.max(0, d.amount_requested - raised);
         return (
           <Link key={d.id} to="/investor/deal/$id" params={{ id: d.id }}>
             <Card className="p-4 hover:shadow-md transition active:scale-[0.99]">
@@ -46,6 +51,14 @@ function Marketplace() {
                 <Stat label="Capital" value={formatMoney(d.amount_requested)} />
                 <Stat label="Equity" value={`${d.equity_offered}%`} />
                 <Stat label="Valuation" value={formatMoney(valuation)} />
+              </div>
+              <div className="mt-3 space-y-1.5">
+                <Progress value={pct} className="h-2" />
+                <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <span>{formatMoney(raised)} raised · {pct}%</span>
+                  <span>Min ticket {formatMoney(d.min_investment || 0)}</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground">{formatMoney(remaining)} remaining</div>
               </div>
             </Card>
           </Link>

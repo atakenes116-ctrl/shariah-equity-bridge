@@ -24,12 +24,14 @@ export type Database = {
           equity_offered: number
           financial_statements_file: string | null
           flags: Json
+          funded_amount: number
           funded_at: string | null
           id: string
           interest_bearing_debt: number
           interest_income: number
           investor_confirmed_receipt: boolean
           investor_id: string | null
+          min_investment: number
           net_profit: number
           pitch: string
           platform_fee: number
@@ -55,12 +57,14 @@ export type Database = {
           equity_offered: number
           financial_statements_file?: string | null
           flags?: Json
+          funded_amount?: number
           funded_at?: string | null
           id?: string
           interest_bearing_debt?: number
           interest_income?: number
           investor_confirmed_receipt?: boolean
           investor_id?: string | null
+          min_investment?: number
           net_profit?: number
           pitch?: string
           platform_fee?: number
@@ -86,12 +90,14 @@ export type Database = {
           equity_offered?: number
           financial_statements_file?: string | null
           flags?: Json
+          funded_amount?: number
           funded_at?: string | null
           id?: string
           interest_bearing_debt?: number
           interest_income?: number
           investor_confirmed_receipt?: boolean
           investor_id?: string | null
+          min_investment?: number
           net_profit?: number
           pitch?: string
           platform_fee?: number
@@ -109,6 +115,65 @@ export type Database = {
           years_in_operation?: number
         }
         Relationships: []
+      }
+      investments: {
+        Row: {
+          amount: number
+          created_at: string
+          deadline: string
+          deal_id: string
+          dispute_reason: string | null
+          equity_percent: number
+          funded_at: string
+          id: string
+          investor_confirmed_receipt: boolean
+          investor_id: string
+          platform_fee: number
+          sme_confirmed_equity: boolean
+          status: Database["public"]["Enums"]["investment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          deadline?: string
+          deal_id: string
+          dispute_reason?: string | null
+          equity_percent: number
+          funded_at?: string
+          id?: string
+          investor_confirmed_receipt?: boolean
+          investor_id: string
+          platform_fee?: number
+          sme_confirmed_equity?: boolean
+          status?: Database["public"]["Enums"]["investment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          deadline?: string
+          deal_id?: string
+          dispute_reason?: string | null
+          equity_percent?: number
+          funded_at?: string
+          id?: string
+          investor_confirmed_receipt?: boolean
+          investor_id?: string
+          platform_fee?: number
+          sme_confirmed_equity?: boolean
+          status?: Database["public"]["Enums"]["investment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -159,6 +224,14 @@ export type Database = {
         | "completed"
         | "refunded"
         | "disputed"
+        | "partially_funded"
+        | "fully_funded"
+      investment_status:
+        | "funds_in_escrow"
+        | "equity_confirmed"
+        | "completed"
+        | "disputed"
+        | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -297,6 +370,15 @@ export const Constants = {
         "completed",
         "refunded",
         "disputed",
+        "partially_funded",
+        "fully_funded",
+      ],
+      investment_status: [
+        "funds_in_escrow",
+        "equity_confirmed",
+        "completed",
+        "disputed",
+        "refunded",
       ],
     },
   },
