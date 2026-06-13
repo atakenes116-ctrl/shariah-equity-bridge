@@ -9,38 +9,194 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SmeRouteImport } from './routes/sme'
+import { Route as InvestorRouteImport } from './routes/investor'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InvestorIndexRouteImport } from './routes/investor.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as SmeStatusRouteImport } from './routes/sme.status'
+import { Route as SmeApplyRouteImport } from './routes/sme.apply'
+import { Route as InvestorPortfolioRouteImport } from './routes/investor.portfolio'
+import { Route as AdminDisputesRouteImport } from './routes/admin.disputes'
+import { Route as InvestorRoomIdRouteImport } from './routes/investor.room.$id'
+import { Route as InvestorDealIdRouteImport } from './routes/investor.deal.$id'
 
+const SmeRoute = SmeRouteImport.update({
+  id: '/sme',
+  path: '/sme',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvestorRoute = InvestorRouteImport.update({
+  id: '/investor',
+  path: '/investor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvestorIndexRoute = InvestorIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InvestorRoute,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const SmeStatusRoute = SmeStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => SmeRoute,
+} as any)
+const SmeApplyRoute = SmeApplyRouteImport.update({
+  id: '/apply',
+  path: '/apply',
+  getParentRoute: () => SmeRoute,
+} as any)
+const InvestorPortfolioRoute = InvestorPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
+  getParentRoute: () => InvestorRoute,
+} as any)
+const AdminDisputesRoute = AdminDisputesRouteImport.update({
+  id: '/disputes',
+  path: '/disputes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const InvestorRoomIdRoute = InvestorRoomIdRouteImport.update({
+  id: '/room/$id',
+  path: '/room/$id',
+  getParentRoute: () => InvestorRoute,
+} as any)
+const InvestorDealIdRoute = InvestorDealIdRouteImport.update({
+  id: '/deal/$id',
+  path: '/deal/$id',
+  getParentRoute: () => InvestorRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/investor': typeof InvestorRouteWithChildren
+  '/sme': typeof SmeRouteWithChildren
+  '/admin/disputes': typeof AdminDisputesRoute
+  '/investor/portfolio': typeof InvestorPortfolioRoute
+  '/sme/apply': typeof SmeApplyRoute
+  '/sme/status': typeof SmeStatusRoute
+  '/admin/': typeof AdminIndexRoute
+  '/investor/': typeof InvestorIndexRoute
+  '/investor/deal/$id': typeof InvestorDealIdRoute
+  '/investor/room/$id': typeof InvestorRoomIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sme': typeof SmeRouteWithChildren
+  '/admin/disputes': typeof AdminDisputesRoute
+  '/investor/portfolio': typeof InvestorPortfolioRoute
+  '/sme/apply': typeof SmeApplyRoute
+  '/sme/status': typeof SmeStatusRoute
+  '/admin': typeof AdminIndexRoute
+  '/investor': typeof InvestorIndexRoute
+  '/investor/deal/$id': typeof InvestorDealIdRoute
+  '/investor/room/$id': typeof InvestorRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/investor': typeof InvestorRouteWithChildren
+  '/sme': typeof SmeRouteWithChildren
+  '/admin/disputes': typeof AdminDisputesRoute
+  '/investor/portfolio': typeof InvestorPortfolioRoute
+  '/sme/apply': typeof SmeApplyRoute
+  '/sme/status': typeof SmeStatusRoute
+  '/admin/': typeof AdminIndexRoute
+  '/investor/': typeof InvestorIndexRoute
+  '/investor/deal/$id': typeof InvestorDealIdRoute
+  '/investor/room/$id': typeof InvestorRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/investor'
+    | '/sme'
+    | '/admin/disputes'
+    | '/investor/portfolio'
+    | '/sme/apply'
+    | '/sme/status'
+    | '/admin/'
+    | '/investor/'
+    | '/investor/deal/$id'
+    | '/investor/room/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/sme'
+    | '/admin/disputes'
+    | '/investor/portfolio'
+    | '/sme/apply'
+    | '/sme/status'
+    | '/admin'
+    | '/investor'
+    | '/investor/deal/$id'
+    | '/investor/room/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/investor'
+    | '/sme'
+    | '/admin/disputes'
+    | '/investor/portfolio'
+    | '/sme/apply'
+    | '/sme/status'
+    | '/admin/'
+    | '/investor/'
+    | '/investor/deal/$id'
+    | '/investor/room/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  InvestorRoute: typeof InvestorRouteWithChildren
+  SmeRoute: typeof SmeRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sme': {
+      id: '/sme'
+      path: '/sme'
+      fullPath: '/sme'
+      preLoaderRoute: typeof SmeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/investor': {
+      id: '/investor'
+      path: '/investor'
+      fullPath: '/investor'
+      preLoaderRoute: typeof InvestorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +204,113 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/investor/': {
+      id: '/investor/'
+      path: '/'
+      fullPath: '/investor/'
+      preLoaderRoute: typeof InvestorIndexRouteImport
+      parentRoute: typeof InvestorRoute
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/sme/status': {
+      id: '/sme/status'
+      path: '/status'
+      fullPath: '/sme/status'
+      preLoaderRoute: typeof SmeStatusRouteImport
+      parentRoute: typeof SmeRoute
+    }
+    '/sme/apply': {
+      id: '/sme/apply'
+      path: '/apply'
+      fullPath: '/sme/apply'
+      preLoaderRoute: typeof SmeApplyRouteImport
+      parentRoute: typeof SmeRoute
+    }
+    '/investor/portfolio': {
+      id: '/investor/portfolio'
+      path: '/portfolio'
+      fullPath: '/investor/portfolio'
+      preLoaderRoute: typeof InvestorPortfolioRouteImport
+      parentRoute: typeof InvestorRoute
+    }
+    '/admin/disputes': {
+      id: '/admin/disputes'
+      path: '/disputes'
+      fullPath: '/admin/disputes'
+      preLoaderRoute: typeof AdminDisputesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/investor/room/$id': {
+      id: '/investor/room/$id'
+      path: '/room/$id'
+      fullPath: '/investor/room/$id'
+      preLoaderRoute: typeof InvestorRoomIdRouteImport
+      parentRoute: typeof InvestorRoute
+    }
+    '/investor/deal/$id': {
+      id: '/investor/deal/$id'
+      path: '/deal/$id'
+      fullPath: '/investor/deal/$id'
+      preLoaderRoute: typeof InvestorDealIdRouteImport
+      parentRoute: typeof InvestorRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminDisputesRoute: typeof AdminDisputesRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminDisputesRoute: AdminDisputesRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface InvestorRouteChildren {
+  InvestorPortfolioRoute: typeof InvestorPortfolioRoute
+  InvestorIndexRoute: typeof InvestorIndexRoute
+  InvestorDealIdRoute: typeof InvestorDealIdRoute
+  InvestorRoomIdRoute: typeof InvestorRoomIdRoute
+}
+
+const InvestorRouteChildren: InvestorRouteChildren = {
+  InvestorPortfolioRoute: InvestorPortfolioRoute,
+  InvestorIndexRoute: InvestorIndexRoute,
+  InvestorDealIdRoute: InvestorDealIdRoute,
+  InvestorRoomIdRoute: InvestorRoomIdRoute,
+}
+
+const InvestorRouteWithChildren = InvestorRoute._addFileChildren(
+  InvestorRouteChildren,
+)
+
+interface SmeRouteChildren {
+  SmeApplyRoute: typeof SmeApplyRoute
+  SmeStatusRoute: typeof SmeStatusRoute
+}
+
+const SmeRouteChildren: SmeRouteChildren = {
+  SmeApplyRoute: SmeApplyRoute,
+  SmeStatusRoute: SmeStatusRoute,
+}
+
+const SmeRouteWithChildren = SmeRoute._addFileChildren(SmeRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  InvestorRoute: InvestorRouteWithChildren,
+  SmeRoute: SmeRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
