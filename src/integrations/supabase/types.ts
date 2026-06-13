@@ -17,11 +17,15 @@ export type Database = {
       deals: {
         Row: {
           amount_requested: number
+          asset_description: string | null
+          asset_name: string | null
+          asset_supplier: string | null
           bank_statements_file: string | null
           country: string
           created_at: string
           deadline: string | null
-          equity_offered: number
+          deal_type: Database["public"]["Enums"]["deal_type"]
+          equity_offered: number | null
           financial_statements_file: string | null
           flags: Json
           funded_amount: number
@@ -35,6 +39,7 @@ export type Database = {
           net_profit: number
           pitch: string
           platform_fee: number
+          profit_rate: number | null
           revenue: number
           review_note: string | null
           reviewed_by: string | null
@@ -44,17 +49,23 @@ export type Database = {
           sme_id: string
           sme_name: string
           status: Database["public"]["Enums"]["deal_status"]
+          tenor_months: number | null
           total_assets: number
+          total_repayable: number | null
           use_of_funds: string
           years_in_operation: number
         }
         Insert: {
           amount_requested: number
+          asset_description?: string | null
+          asset_name?: string | null
+          asset_supplier?: string | null
           bank_statements_file?: string | null
           country: string
           created_at?: string
           deadline?: string | null
-          equity_offered: number
+          deal_type?: Database["public"]["Enums"]["deal_type"]
+          equity_offered?: number | null
           financial_statements_file?: string | null
           flags?: Json
           funded_amount?: number
@@ -68,6 +79,7 @@ export type Database = {
           net_profit?: number
           pitch?: string
           platform_fee?: number
+          profit_rate?: number | null
           revenue?: number
           review_note?: string | null
           reviewed_by?: string | null
@@ -77,17 +89,23 @@ export type Database = {
           sme_id: string
           sme_name: string
           status?: Database["public"]["Enums"]["deal_status"]
+          tenor_months?: number | null
           total_assets?: number
+          total_repayable?: number | null
           use_of_funds?: string
           years_in_operation?: number
         }
         Update: {
           amount_requested?: number
+          asset_description?: string | null
+          asset_name?: string | null
+          asset_supplier?: string | null
           bank_statements_file?: string | null
           country?: string
           created_at?: string
           deadline?: string | null
-          equity_offered?: number
+          deal_type?: Database["public"]["Enums"]["deal_type"]
+          equity_offered?: number | null
           financial_statements_file?: string | null
           flags?: Json
           funded_amount?: number
@@ -101,6 +119,7 @@ export type Database = {
           net_profit?: number
           pitch?: string
           platform_fee?: number
+          profit_rate?: number | null
           revenue?: number
           review_note?: string | null
           reviewed_by?: string | null
@@ -110,11 +129,57 @@ export type Database = {
           sme_id?: string
           sme_name?: string
           status?: Database["public"]["Enums"]["deal_status"]
+          tenor_months?: number | null
           total_assets?: number
+          total_repayable?: number | null
           use_of_funds?: string
           years_in_operation?: number
         }
         Relationships: []
+      }
+      installments: {
+        Row: {
+          created_at: string
+          deal_id: string
+          due_date: string
+          id: string
+          paid_at: string | null
+          seq: number
+          status: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deal_id: string
+          due_date: string
+          id?: string
+          paid_at?: string | null
+          seq: number
+          status?: string
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deal_id?: string
+          due_date?: string
+          id?: string
+          paid_at?: string | null
+          seq?: number
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installments_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       investments: {
         Row: {
@@ -123,12 +188,13 @@ export type Database = {
           deadline: string
           deal_id: string
           dispute_reason: string | null
-          equity_percent: number
+          equity_percent: number | null
           funded_at: string
           id: string
           investor_confirmed_receipt: boolean
           investor_id: string
           platform_fee: number
+          share_percent: number | null
           sme_confirmed_equity: boolean
           status: Database["public"]["Enums"]["investment_status"]
           updated_at: string
@@ -139,12 +205,13 @@ export type Database = {
           deadline?: string
           deal_id: string
           dispute_reason?: string | null
-          equity_percent: number
+          equity_percent?: number | null
           funded_at?: string
           id?: string
           investor_confirmed_receipt?: boolean
           investor_id: string
           platform_fee?: number
+          share_percent?: number | null
           sme_confirmed_equity?: boolean
           status?: Database["public"]["Enums"]["investment_status"]
           updated_at?: string
@@ -155,12 +222,13 @@ export type Database = {
           deadline?: string
           deal_id?: string
           dispute_reason?: string | null
-          equity_percent?: number
+          equity_percent?: number | null
           funded_at?: string
           id?: string
           investor_confirmed_receipt?: boolean
           investor_id?: string
           platform_fee?: number
+          share_percent?: number | null
           sme_confirmed_equity?: boolean
           status?: Database["public"]["Enums"]["investment_status"]
           updated_at?: string
@@ -230,6 +298,7 @@ export type Database = {
         | "disputed"
         | "partially_funded"
         | "fully_funded"
+      deal_type: "musharakah" | "murabaha"
       investment_status:
         | "funds_in_escrow"
         | "equity_confirmed"
@@ -377,6 +446,7 @@ export const Constants = {
         "partially_funded",
         "fully_funded",
       ],
+      deal_type: ["musharakah", "murabaha"],
       investment_status: [
         "funds_in_escrow",
         "equity_confirmed",
