@@ -10,17 +10,25 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/admin/disputes")({ component: Disputes });
 
 function Disputes() {
-  const [deals, setDeals] = useState<any[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
+
   async function load() {
-    const { data } = await supabase.from("deals").select("*").eq("status", "disputed").order("created_at");
-    setDeals(data ?? []);
+    const { data: invs } = await supabase.from("investments").select("*").eq("status", "disputed").order("updated_at");
+    const list = invs ?? [];
+    if (list.length === 0) { setRows([]); return; }
+    const { data: deals } = await supabase.from("deals").select("id,sme_name,amount_requested,equity_offered").in("id", list.map((i: any) => i.deal_id));
+    const byId = new Map((deals ?? []).map((d: any) => [d.id, d]));
+    setRows(list.map((i: any) => ({ ...i, deal: byId.get(i.deal_id) })));
   }
   useEffect(() => { load(); }, []);
 
-  async function resolve(id: string, outcome: "completed" | "refunded") {
+  async function resolve(invId: string, outcome: "completed" | "refunded") {
     const update: any = { status: outcome };
-    if (outcome === "completed") update.platform_fee = (deals.find(d => d.id === id)?.amount_requested ?? 0) * 0.03;
-    const { error } = await supabase.from("deals").update(update).eq("id", id);
+    if (outcome === "completed") {
+      const i = rows.find(r => r.id === invId);
+      update.platform_fee = Number(i?.amount ?? 0) * 0.03;
+    }
+    const { error } = await supabase.from("investments").update(update).eq("id", invId);
     if (error) return toast.error(error.message);
     toast.success(`Resolved as ${outcome}`); load();
   }
@@ -28,20 +36,22 @@ function Disputes() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Disputes</h1>
-      {deals.length === 0 && <Card className="p-8 text-center text-muted-foreground">No open disputes.</Card>}
-      {deals.map((d) => (
-        <Card key={d.id} className="p-6">
+      {rows.length === 0 && <Card className="p-8 text-center text-muted-foreground">No open disputes.</Card>}
+      {rows.map((i) => (
+        <Card key={i.id} className="p-6">
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold">{d.sme_name}</h2>
+            <h2 className="font-semibold">{i.deal?.sme_name ?? "—"}</h2>
             <Badge variant="destructive">Disputed</Badge>
           </div>
-          <div className="text-sm text-muted-foreground mt-1">{formatMoney(d.amount_requested)} for {d.equity_offered}% equity</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            Investor ticket: {formatMoney(i.amount)} ({Number(i.equity_percent).toFixed(2)}% equity) · round {formatMoney(i.deal?.amount_requested ?? 0)} for {i.deal?.equity_offered ?? 0}%
+          </div>
           <div className="mt-3 text-sm">
-            SME confirmed equity: {d.sme_confirmed_equity ? "yes" : "no"} · Investor confirmed receipt: {d.investor_confirmed_receipt ? "yes" : "no"}
+            SME confirmed equity: {i.sme_confirmed_equity ? "yes" : "no"} · Investor confirmed receipt: {i.investor_confirmed_receipt ? "yes" : "no"}
           </div>
           <div className="mt-4 flex gap-2">
-            <Button onClick={() => resolve(d.id, "completed")}>Release to SME</Button>
-            <Button variant="outline" onClick={() => resolve(d.id, "refunded")}>Refund investor</Button>
+            <Button onClick={() => resolve(i.id, "completed")}>Release to SME</Button>
+            <Button variant="outline" onClick={() => resolve(i.id, "refunded")}>Refund investor</Button>
           </div>
         </Card>
       ))}

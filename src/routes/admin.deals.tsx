@@ -2,37 +2,22 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatMoney } from "@/lib/screening";
-import { CheckCircle2, Circle, AlertTriangle, XCircle } from "lucide-react";
+import { AlertTriangle, XCircle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/deals")({ component: DealsProgress });
-
-const STAGES: { key: string; label: string }[] = [
-  { key: "under_review", label: "Under review" },
-  { key: "approved", label: "Approved / listed" },
-  { key: "funds_in_escrow", label: "Funds in escrow" },
-  { key: "equity_confirmed", label: "Equity confirmed" },
-  { key: "completed", label: "Completed" },
-];
-
-function stageIndex(status: string) {
-  const i = STAGES.findIndex((s) => s.key === status);
-  return i === -1 ? 0 : i;
-}
 
 function statusBadge(status: string) {
   const map: Record<string, { label: string; cls: string }> = {
     under_review: { label: "Under review", cls: "bg-muted text-foreground" },
     approved: { label: "Approved", cls: "bg-primary/15 text-primary" },
+    partially_funded: { label: "Partially funded", cls: "bg-amber-100 text-amber-900" },
+    fully_funded: { label: "Fully funded", cls: "bg-emerald-100 text-emerald-900" },
     rejected: { label: "Rejected", cls: "bg-destructive/15 text-destructive" },
-    funds_in_escrow: { label: "Funds in escrow", cls: "bg-amber-100 text-amber-900" },
-    equity_confirmed: { label: "Equity confirmed", cls: "bg-emerald-100 text-emerald-900" },
     completed: { label: "Completed", cls: "bg-primary text-primary-foreground" },
-    refunded: { label: "Refunded", cls: "bg-muted text-foreground" },
     disputed: { label: "Disputed", cls: "bg-destructive/15 text-destructive" },
+    refunded: { label: "Refunded", cls: "bg-muted text-foreground" },
     draft: { label: "Draft", cls: "bg-muted text-foreground" },
   };
   const v = map[status] ?? { label: status, cls: "bg-muted" };
@@ -41,29 +26,35 @@ function statusBadge(status: string) {
 
 function DealsProgress() {
   const [deals, setDeals] = useState<any[]>([]);
+  const [invByDeal, setInvByDeal] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from("deals").select("*").order("created_at", { ascending: false }).then(({ data }) => {
-      setDeals(data ?? []);
+    (async () => {
+      const { data: ds } = await supabase.from("deals").select("*").order("created_at", { ascending: false });
+      setDeals(ds ?? []);
+      if (ds && ds.length) {
+        const { data: invs } = await supabase.from("investments").select("*").in("deal_id", ds.map((d: any) => d.id));
+        const g: Record<string, any[]> = {};
+        (invs ?? []).forEach((i: any) => { (g[i.deal_id] ||= []).push(i); });
+        setInvByDeal(g);
+      }
       setLoading(false);
-    });
+    })();
   }, []);
 
   const totals = {
     all: deals.length,
-    active: deals.filter((d) => ["under_review", "approved", "funds_in_escrow", "equity_confirmed"].includes(d.status)).length,
+    active: deals.filter((d) => ["under_review", "approved", "partially_funded", "fully_funded"].includes(d.status)).length,
     completed: deals.filter((d) => d.status === "completed").length,
-    issues: deals.filter((d) => ["rejected", "refunded", "disputed"].includes(d.status)).length,
-    deployed: deals.filter((d) => ["funds_in_escrow", "equity_confirmed", "completed"].includes(d.status))
-      .reduce((s, d) => s + Number(d.amount_requested ?? 0), 0),
+    deployed: deals.reduce((s, d) => s + Number(d.funded_amount ?? 0), 0),
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Investment progress</h1>
-        <p className="text-sm text-muted-foreground">Track every deal through the escrow lifecycle.</p>
+        <p className="text-sm text-muted-foreground">Per-deal funding progress with each investor's slice.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
@@ -76,69 +67,63 @@ function DealsProgress() {
       {loading && <Card className="p-8 text-center text-muted-foreground">Loading…</Card>}
       {!loading && deals.length === 0 && <Card className="p-8 text-center text-muted-foreground">No deals yet.</Card>}
 
-      {!loading && deals.length > 0 && (
-        <Card className="p-0 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SME</TableHead>
-                <TableHead>Amount / equity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[320px]">Escrow progress</TableHead>
-                <TableHead>Confirmations</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deals.map((d) => {
-                const terminal = d.status === "completed";
-                const failed = d.status === "rejected" || d.status === "refunded";
-                const disputed = d.status === "disputed";
-                const idx = stageIndex(d.status);
-                const pct = terminal ? 100 : failed ? 0 : Math.round((idx / (STAGES.length - 1)) * 100);
-                return (
-                  <TableRow key={d.id}>
-                    <TableCell>
-                      <div className="font-medium">{d.sme_name}</div>
-                      <div className="text-xs text-muted-foreground">{d.sector} · {d.country}</div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <div>{formatMoney(d.amount_requested)}</div>
-                      <div className="text-xs text-muted-foreground">{d.equity_offered}% equity</div>
-                    </TableCell>
-                    <TableCell>{statusBadge(d.status)}</TableCell>
-                    <TableCell>
-                      {failed ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground"><XCircle className="h-4 w-4 text-destructive" /> Did not proceed</div>
-                      ) : disputed ? (
-                        <div className="flex items-center gap-2 text-sm text-amber-700"><AlertTriangle className="h-4 w-4" /> In dispute</div>
-                      ) : (
-                        <div className="space-y-2">
-                          <Progress value={pct} className="h-2" />
-                          <div className="flex justify-between text-[10px] text-muted-foreground">
-                            {STAGES.map((s, i) => (
-                              <div key={s.key} className="flex flex-col items-center gap-0.5 w-1/5">
-                                {i <= idx
-                                  ? <CheckCircle2 className="h-3 w-3 text-primary" />
-                                  : <Circle className="h-3 w-3" />}
-                                <span className="text-center leading-tight">{s.label}</span>
-                              </div>
-                            ))}
-                          </div>
+      <div className="space-y-4">
+        {deals.map((d) => {
+          const raised = Number(d.funded_amount ?? 0);
+          const pct = Math.min(100, Math.round((raised / d.amount_requested) * 100));
+          const invs = invByDeal[d.id] ?? [];
+          const equityAllocated = invs.reduce((s, i) => s + Number(i.equity_percent ?? 0), 0);
+          const failed = d.status === "rejected" || d.status === "refunded";
+          return (
+            <Card key={d.id} className="p-5 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold">{d.sme_name}</div>
+                    {statusBadge(d.status)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{d.sector} · {d.country} · seeking {formatMoney(d.amount_requested)} for {d.equity_offered}%</div>
+                </div>
+                <div className="text-right text-sm">
+                  <div className="font-medium">{formatMoney(raised)} / {formatMoney(d.amount_requested)}</div>
+                  <div className="text-xs text-muted-foreground">{equityAllocated.toFixed(2)}% equity allocated</div>
+                </div>
+              </div>
+
+              {failed ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground"><XCircle className="h-4 w-4 text-destructive" /> Did not proceed</div>
+              ) : d.status === "under_review" ? (
+                <div className="text-sm text-muted-foreground">Awaiting admin review.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Progress value={pct} className="h-2" />
+                  <div className="text-[11px] text-muted-foreground">{pct}% funded</div>
+                </div>
+              )}
+
+              {invs.length > 0 && (
+                <div className="rounded-md border divide-y">
+                  {invs.map((i) => (
+                    <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
+                      <div>
+                        <div className="font-medium">{formatMoney(i.amount)} · {Number(i.equity_percent).toFixed(2)}%</div>
+                        <div className="text-xs text-muted-foreground">
+                          Investor {i.investor_id.slice(0, 8)}… · funded {new Date(i.funded_at).toLocaleDateString()}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <div>SME equity: {d.sme_confirmed_equity ? "✓" : "—"}</div>
-                      <div>Investor receipt: {d.investor_confirmed_receipt ? "✓" : "—"}</div>
-                      {d.funded_at && <div className="text-muted-foreground">Funded {new Date(d.funded_at).toLocaleDateString()}</div>}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
+                      </div>
+                      <div className="text-xs">
+                        {statusBadge(i.status)}
+                        <div className="mt-1 text-muted-foreground">SME ✓ {i.sme_confirmed_equity ? "yes" : "no"} · receipt ✓ {i.investor_confirmed_receipt ? "yes" : "no"}</div>
+                      </div>
+                      {i.status === "disputed" && <div className="flex items-center gap-1 text-amber-700 text-xs"><AlertTriangle className="h-3 w-3" /> In dispute</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
