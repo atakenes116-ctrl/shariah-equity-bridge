@@ -14,16 +14,151 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      deals: {
+        Row: {
+          amount_requested: number
+          bank_statements_file: string | null
+          country: string
+          created_at: string
+          deadline: string | null
+          equity_offered: number
+          financial_statements_file: string | null
+          flags: Json
+          funded_at: string | null
+          id: string
+          interest_bearing_debt: number
+          interest_income: number
+          investor_confirmed_receipt: boolean
+          investor_id: string | null
+          net_profit: number
+          pitch: string
+          platform_fee: number
+          revenue: number
+          review_note: string | null
+          reviewed_by: string | null
+          sector: string
+          shariah_status: string
+          sme_confirmed_equity: boolean
+          sme_id: string
+          sme_name: string
+          status: Database["public"]["Enums"]["deal_status"]
+          total_assets: number
+          use_of_funds: string
+          years_in_operation: number
+        }
+        Insert: {
+          amount_requested: number
+          bank_statements_file?: string | null
+          country: string
+          created_at?: string
+          deadline?: string | null
+          equity_offered: number
+          financial_statements_file?: string | null
+          flags?: Json
+          funded_at?: string | null
+          id?: string
+          interest_bearing_debt?: number
+          interest_income?: number
+          investor_confirmed_receipt?: boolean
+          investor_id?: string | null
+          net_profit?: number
+          pitch?: string
+          platform_fee?: number
+          revenue?: number
+          review_note?: string | null
+          reviewed_by?: string | null
+          sector: string
+          shariah_status?: string
+          sme_confirmed_equity?: boolean
+          sme_id: string
+          sme_name: string
+          status?: Database["public"]["Enums"]["deal_status"]
+          total_assets?: number
+          use_of_funds?: string
+          years_in_operation?: number
+        }
+        Update: {
+          amount_requested?: number
+          bank_statements_file?: string | null
+          country?: string
+          created_at?: string
+          deadline?: string | null
+          equity_offered?: number
+          financial_statements_file?: string | null
+          flags?: Json
+          funded_at?: string | null
+          id?: string
+          interest_bearing_debt?: number
+          interest_income?: number
+          investor_confirmed_receipt?: boolean
+          investor_id?: string | null
+          net_profit?: number
+          pitch?: string
+          platform_fee?: number
+          revenue?: number
+          review_note?: string | null
+          reviewed_by?: string | null
+          sector?: string
+          shariah_status?: string
+          sme_confirmed_equity?: boolean
+          sme_id?: string
+          sme_name?: string
+          status?: Database["public"]["Enums"]["deal_status"]
+          total_assets?: number
+          use_of_funds?: string
+          years_in_operation?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          role: Database["public"]["Enums"]["app_role"]
+          wallet_balance: number
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          wallet_balance?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          wallet_balance?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "sme" | "investor" | "admin"
+      deal_status:
+        | "draft"
+        | "under_review"
+        | "approved"
+        | "rejected"
+        | "funds_in_escrow"
+        | "equity_confirmed"
+        | "completed"
+        | "refunded"
+        | "disputed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +285,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["sme", "investor", "admin"],
+      deal_status: [
+        "draft",
+        "under_review",
+        "approved",
+        "rejected",
+        "funds_in_escrow",
+        "equity_confirmed",
+        "completed",
+        "refunded",
+        "disputed",
+      ],
+    },
   },
 } as const
