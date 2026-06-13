@@ -19,6 +19,7 @@ import { Route as SmeStatusRouteImport } from './routes/sme.status'
 import { Route as SmeApplyRouteImport } from './routes/sme.apply'
 import { Route as InvestorPortfolioRouteImport } from './routes/investor.portfolio'
 import { Route as AdminDisputesRouteImport } from './routes/admin.disputes'
+import { Route as AdminDealsRouteImport } from './routes/admin.deals'
 import { Route as InvestorRoomIdRouteImport } from './routes/investor.room.$id'
 import { Route as InvestorDealIdRouteImport } from './routes/investor.deal.$id'
 
@@ -72,6 +73,11 @@ const AdminDisputesRoute = AdminDisputesRouteImport.update({
   path: '/disputes',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDealsRoute = AdminDealsRouteImport.update({
+  id: '/deals',
+  path: '/deals',
+  getParentRoute: () => AdminRoute,
+} as any)
 const InvestorRoomIdRoute = InvestorRoomIdRouteImport.update({
   id: '/room/$id',
   path: '/room/$id',
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/investor': typeof InvestorRouteWithChildren
   '/sme': typeof SmeRouteWithChildren
+  '/admin/deals': typeof AdminDealsRoute
   '/admin/disputes': typeof AdminDisputesRoute
   '/investor/portfolio': typeof InvestorPortfolioRoute
   '/sme/apply': typeof SmeApplyRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sme': typeof SmeRouteWithChildren
+  '/admin/deals': typeof AdminDealsRoute
   '/admin/disputes': typeof AdminDisputesRoute
   '/investor/portfolio': typeof InvestorPortfolioRoute
   '/sme/apply': typeof SmeApplyRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/investor': typeof InvestorRouteWithChildren
   '/sme': typeof SmeRouteWithChildren
+  '/admin/deals': typeof AdminDealsRoute
   '/admin/disputes': typeof AdminDisputesRoute
   '/investor/portfolio': typeof InvestorPortfolioRoute
   '/sme/apply': typeof SmeApplyRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/investor'
     | '/sme'
+    | '/admin/deals'
     | '/admin/disputes'
     | '/investor/portfolio'
     | '/sme/apply'
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/sme'
+    | '/admin/deals'
     | '/admin/disputes'
     | '/investor/portfolio'
     | '/sme/apply'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/investor'
     | '/sme'
+    | '/admin/deals'
     | '/admin/disputes'
     | '/investor/portfolio'
     | '/sme/apply'
@@ -246,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDisputesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/deals': {
+      id: '/admin/deals'
+      path: '/deals'
+      fullPath: '/admin/deals'
+      preLoaderRoute: typeof AdminDealsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/investor/room/$id': {
       id: '/investor/room/$id'
       path: '/room/$id'
@@ -264,11 +283,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminDealsRoute: typeof AdminDealsRoute
   AdminDisputesRoute: typeof AdminDisputesRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminDealsRoute: AdminDealsRoute,
   AdminDisputesRoute: AdminDisputesRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
