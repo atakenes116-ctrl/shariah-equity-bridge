@@ -15,6 +15,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as InvestorIndexRouteImport } from './routes/investor.index'
 import { Route as SmeStatusRouteImport } from './routes/sme.status'
 import { Route as SmeApplyRouteImport } from './routes/sme.apply'
+import { Route as InvestorPortfolioRouteImport } from './routes/investor.portfolio'
+import { Route as InvestorRoomIdRouteImport } from './routes/investor.room.$id'
+import { Route as InvestorDealIdRouteImport } from './routes/investor.deal.$id'
 
 const SmeRoute = SmeRouteImport.update({
   id: '/sme',
@@ -46,30 +49,54 @@ const SmeApplyRoute = SmeApplyRouteImport.update({
   path: '/apply',
   getParentRoute: () => SmeRoute,
 } as any)
+const InvestorPortfolioRoute = InvestorPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
+  getParentRoute: () => InvestorRoute,
+} as any)
+const InvestorRoomIdRoute = InvestorRoomIdRouteImport.update({
+  id: '/room/$id',
+  path: '/room/$id',
+  getParentRoute: () => InvestorRoute,
+} as any)
+const InvestorDealIdRoute = InvestorDealIdRouteImport.update({
+  id: '/deal/$id',
+  path: '/deal/$id',
+  getParentRoute: () => InvestorRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/investor': typeof InvestorRouteWithChildren
   '/sme': typeof SmeRouteWithChildren
+  '/investor/portfolio': typeof InvestorPortfolioRoute
   '/sme/apply': typeof SmeApplyRoute
   '/sme/status': typeof SmeStatusRoute
   '/investor/': typeof InvestorIndexRoute
+  '/investor/deal/$id': typeof InvestorDealIdRoute
+  '/investor/room/$id': typeof InvestorRoomIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sme': typeof SmeRouteWithChildren
+  '/investor/portfolio': typeof InvestorPortfolioRoute
   '/sme/apply': typeof SmeApplyRoute
   '/sme/status': typeof SmeStatusRoute
   '/investor': typeof InvestorIndexRoute
+  '/investor/deal/$id': typeof InvestorDealIdRoute
+  '/investor/room/$id': typeof InvestorRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/investor': typeof InvestorRouteWithChildren
   '/sme': typeof SmeRouteWithChildren
+  '/investor/portfolio': typeof InvestorPortfolioRoute
   '/sme/apply': typeof SmeApplyRoute
   '/sme/status': typeof SmeStatusRoute
   '/investor/': typeof InvestorIndexRoute
+  '/investor/deal/$id': typeof InvestorDealIdRoute
+  '/investor/room/$id': typeof InvestorRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -77,19 +104,33 @@ export interface FileRouteTypes {
     | '/'
     | '/investor'
     | '/sme'
+    | '/investor/portfolio'
     | '/sme/apply'
     | '/sme/status'
     | '/investor/'
+    | '/investor/deal/$id'
+    | '/investor/room/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sme' | '/sme/apply' | '/sme/status' | '/investor'
+  to:
+    | '/'
+    | '/sme'
+    | '/investor/portfolio'
+    | '/sme/apply'
+    | '/sme/status'
+    | '/investor'
+    | '/investor/deal/$id'
+    | '/investor/room/$id'
   id:
     | '__root__'
     | '/'
     | '/investor'
     | '/sme'
+    | '/investor/portfolio'
     | '/sme/apply'
     | '/sme/status'
     | '/investor/'
+    | '/investor/deal/$id'
+    | '/investor/room/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -142,15 +183,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SmeApplyRouteImport
       parentRoute: typeof SmeRoute
     }
+    '/investor/portfolio': {
+      id: '/investor/portfolio'
+      path: '/portfolio'
+      fullPath: '/investor/portfolio'
+      preLoaderRoute: typeof InvestorPortfolioRouteImport
+      parentRoute: typeof InvestorRoute
+    }
+    '/investor/room/$id': {
+      id: '/investor/room/$id'
+      path: '/room/$id'
+      fullPath: '/investor/room/$id'
+      preLoaderRoute: typeof InvestorRoomIdRouteImport
+      parentRoute: typeof InvestorRoute
+    }
+    '/investor/deal/$id': {
+      id: '/investor/deal/$id'
+      path: '/deal/$id'
+      fullPath: '/investor/deal/$id'
+      preLoaderRoute: typeof InvestorDealIdRouteImport
+      parentRoute: typeof InvestorRoute
+    }
   }
 }
 
 interface InvestorRouteChildren {
+  InvestorPortfolioRoute: typeof InvestorPortfolioRoute
   InvestorIndexRoute: typeof InvestorIndexRoute
+  InvestorDealIdRoute: typeof InvestorDealIdRoute
+  InvestorRoomIdRoute: typeof InvestorRoomIdRoute
 }
 
 const InvestorRouteChildren: InvestorRouteChildren = {
+  InvestorPortfolioRoute: InvestorPortfolioRoute,
   InvestorIndexRoute: InvestorIndexRoute,
+  InvestorDealIdRoute: InvestorDealIdRoute,
+  InvestorRoomIdRoute: InvestorRoomIdRoute,
 }
 
 const InvestorRouteWithChildren = InvestorRoute._addFileChildren(
