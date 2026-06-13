@@ -3,6 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 export const seedDemoData = createServerFn({ method: "POST" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  const assertOk = (error: { message?: string } | null, action: string) => {
+    if (error) throw new Error(`${action}: ${error.message ?? "Unknown backend error"}`);
+  };
+
   const demos = [
     { email: "sme@demo.app", password: "demo1234", name: "Amina Hassan", role: "sme" as const },
     { email: "investor@demo.app", password: "demo1234", name: "Yusuf Karim", role: "investor" as const },
@@ -18,10 +22,11 @@ export const seedDemoData = createServerFn({ method: "POST" }).handler(async () 
     if (existing) {
       ids[d.role] = existing.id;
       // Ensure profile reflects correct role/name/balance
-      await supabaseAdmin.from("profiles").upsert({
+      const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: existing.id, name: d.name, role: d.role,
         wallet_balance: d.role === "investor" ? 500000 : 0,
       });
+      assertOk(profileError, `Failed to refresh profile for ${d.email}`);
       continue;
     }
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
@@ -35,7 +40,8 @@ export const seedDemoData = createServerFn({ method: "POST" }).handler(async () 
   }
 
   // Reset & seed deals
-  await supabaseAdmin.from("deals").delete().eq("sme_id", ids.sme);
+  const { error: deleteError } = await supabaseAdmin.from("deals").delete().eq("sme_id", ids.sme);
+  assertOk(deleteError, "Failed to reset demo deals");
 
   // Deal 1: approved, no flags — organic food distributor
   const cleanDeal = {
@@ -136,7 +142,11 @@ export const seedDemoData = createServerFn({ method: "POST" }).handler(async () 
     ],
   };
 
-  await supabaseAdmin.from("deals").insert([cleanDeal, flaggedDeal, murabahaDeal]);
+  const { data: seededDeals, error: insertError } = await supabaseAdmin
+    .from("deals")
+    .insert([cleanDeal, flaggedDeal, murabahaDeal])
+    .select("id");
+  assertOk(insertError, "Failed to create demo deals");
 
-  return { ok: true, accounts: demos.map(d => ({ email: d.email, password: d.password, role: d.role })) };
+  return { ok: true, deals: seededDeals?.length ?? 0, accounts: demos.map(d => ({ email: d.email, password: d.password, role: d.role })) };
 });
