@@ -40,17 +40,24 @@ function ReviewQueue() {
       {deals.length === 0 && <Card className="p-8 text-center text-muted-foreground">Inbox zero. No applications pending review.</Card>}
       {deals.map((d) => {
         const warnCount = (d.flags as any[]).filter(f => f.severity === "warn").length;
+        const isMur = d.deal_type === "murabaha";
         return (
           <Card key={d.id} className="p-6 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold">{d.sme_name}</h2>
+                  <Badge variant="outline">{isMur ? "Murabaha" : "Equity"}</Badge>
                   {warnCount > 0 ? <Badge variant="destructive">{warnCount} warnings</Badge> : <Badge className="bg-primary text-primary-foreground">Clean</Badge>}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {d.sector} · {d.country} · {d.years_in_operation}y · seeking {formatMoney(d.amount_requested)} for {d.equity_offered}%
+                  {d.sector} · {d.country} · {d.years_in_operation}y · {isMur
+                    ? <>asset {formatMoney(d.amount_requested)} · {d.tenor_months}mo at {((d.profit_rate ?? 0)*100).toFixed(0)}% profit</>
+                    : <>seeking {formatMoney(d.amount_requested)} for {d.equity_offered}%</>}
                 </div>
+                {isMur && d.asset_name && (
+                  <div className="text-xs text-muted-foreground mt-0.5"><b>{d.asset_name}</b>{d.asset_supplier ? ` · supplier ${d.asset_supplier}` : ""}{d.asset_description ? ` — ${d.asset_description}` : ""}</div>
+                )}
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
