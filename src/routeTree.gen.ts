@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SmeRouteImport } from './routes/sme'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SmeStatusRouteImport } from './routes/sme.status'
+import { Route as SmeApplyRouteImport } from './routes/sme.apply'
 
 const SmeRoute = SmeRouteImport.update({
   id: '/sme',
@@ -22,31 +24,47 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SmeStatusRoute = SmeStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => SmeRoute,
+} as any)
+const SmeApplyRoute = SmeApplyRouteImport.update({
+  id: '/apply',
+  path: '/apply',
+  getParentRoute: () => SmeRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/sme': typeof SmeRoute
+  '/sme': typeof SmeRouteWithChildren
+  '/sme/apply': typeof SmeApplyRoute
+  '/sme/status': typeof SmeStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/sme': typeof SmeRoute
+  '/sme': typeof SmeRouteWithChildren
+  '/sme/apply': typeof SmeApplyRoute
+  '/sme/status': typeof SmeStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/sme': typeof SmeRoute
+  '/sme': typeof SmeRouteWithChildren
+  '/sme/apply': typeof SmeApplyRoute
+  '/sme/status': typeof SmeStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sme'
+  fullPaths: '/' | '/sme' | '/sme/apply' | '/sme/status'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sme'
-  id: '__root__' | '/' | '/sme'
+  to: '/' | '/sme' | '/sme/apply' | '/sme/status'
+  id: '__root__' | '/' | '/sme' | '/sme/apply' | '/sme/status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SmeRoute: typeof SmeRoute
+  SmeRoute: typeof SmeRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +83,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sme/status': {
+      id: '/sme/status'
+      path: '/status'
+      fullPath: '/sme/status'
+      preLoaderRoute: typeof SmeStatusRouteImport
+      parentRoute: typeof SmeRoute
+    }
+    '/sme/apply': {
+      id: '/sme/apply'
+      path: '/apply'
+      fullPath: '/sme/apply'
+      preLoaderRoute: typeof SmeApplyRouteImport
+      parentRoute: typeof SmeRoute
+    }
   }
 }
 
+interface SmeRouteChildren {
+  SmeApplyRoute: typeof SmeApplyRoute
+  SmeStatusRoute: typeof SmeStatusRoute
+}
+
+const SmeRouteChildren: SmeRouteChildren = {
+  SmeApplyRoute: SmeApplyRoute,
+  SmeStatusRoute: SmeStatusRoute,
+}
+
+const SmeRouteWithChildren = SmeRoute._addFileChildren(SmeRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SmeRoute: SmeRoute,
+  SmeRoute: SmeRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
