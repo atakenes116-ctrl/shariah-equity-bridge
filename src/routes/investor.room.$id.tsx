@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/screening";
+import { investorMonthly } from "@/lib/murabaha";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, Circle, AlertTriangle } from "lucide-react";
 
@@ -22,6 +23,7 @@ function DealRoom() {
   const { user } = useAuth();
   const [inv, setInv] = useState<any>(null);
   const [deal, setDeal] = useState<any>(null);
+  const [installments, setInstallments] = useState<any[]>([]);
 
   async function load() {
     const { data: i } = await supabase.from("investments").select("*").eq("id", id).maybeSingle();
@@ -29,11 +31,16 @@ function DealRoom() {
     if (i) {
       const { data: d } = await supabase.from("deals").select("*").eq("id", i.deal_id).maybeSingle();
       setDeal(d);
+      if (d?.deal_type === "murabaha") {
+        const { data: ins } = await supabase.from("installments").select("*").eq("deal_id", i.deal_id).order("seq");
+        setInstallments(ins ?? []);
+      }
     }
   }
   useEffect(() => { load(); }, [id]);
 
   if (!inv || !deal) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  const isMur = deal.deal_type === "murabaha";
 
   const stepIdx = ["funds_in_escrow", "equity_confirmed", "completed"].indexOf(inv.status);
 
@@ -62,6 +69,10 @@ function DealRoom() {
   }
 
   const isInvestor = user?.id === inv.investor_id;
+  const share = isMur && deal.amount_requested > 0 ? Number(inv.amount) / Number(deal.amount_requested) : 0;
+  const myMur = isMur ? investorMonthly(Number(inv.amount), Number(deal.amount_requested), deal.tenor_months ?? 0) : null;
+  const paidCount = installments.filter((x) => x.status === "paid").length;
+  const receivedSoFar = installments.filter((x) => x.status === "paid").reduce((s, x) => s + Number(x.total_amount) * share, 0);
 
   return (
     <div className="space-y-4">
@@ -69,20 +80,41 @@ function DealRoom() {
       <div>
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-xl font-semibold">{deal.sme_name}</h1>
+          <Badge variant="outline">{isMur ? "Murabaha" : "Equity"}</Badge>
           <Badge variant="outline">{inv.status.replace(/_/g, " ")}</Badge>
         </div>
-        <div className="text-sm text-muted-foreground">
-          Your ticket: {formatMoney(inv.amount)} for {Number(inv.equity_percent).toFixed(2)}% equity
-        </div>
-        <div className="text-xs text-muted-foreground mt-0.5">
-          Round: {formatMoney(deal.amount_requested)} for {deal.equity_offered}% equity
-        </div>
+        {isMur ? (
+          <>
+            <div className="text-sm text-muted-foreground">
+              Your ticket: {formatMoney(inv.amount)} · {(share*100).toFixed(2)}% share of installments
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Asset: {deal.asset_name} · {deal.tenor_months}mo · profit {((deal.profit_rate ?? 0)*100).toFixed(0)}%
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-sm text-muted-foreground">
+              Your ticket: {formatMoney(inv.amount)} for {Number(inv.equity_percent ?? 0).toFixed(2)}% equity
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Round: {formatMoney(deal.amount_requested)} for {deal.equity_offered}% equity
+            </div>
+          </>
+        )}
       </div>
 
       <Card className="p-4">
-        <h2 className="font-medium mb-3">Escrow progress</h2>
+        <h2 className="font-medium mb-3">{isMur ? "Funding & asset purchase" : "Escrow progress"}</h2>
         <ol className="space-y-3">
-          {STEPS.map((s, i) => {
+          {(isMur
+            ? [
+                { key: "funds_in_escrow", label: "Funds in escrow" },
+                { key: "equity_confirmed", label: "Asset purchased & delivered" },
+                { key: "completed", label: "Repayments active" },
+              ]
+            : STEPS
+          ).map((s, i) => {
             const done = i <= stepIdx && inv.status !== "refunded" && inv.status !== "disputed";
             return (
               <li key={s.key} className="flex items-start gap-3">
@@ -98,14 +130,39 @@ function DealRoom() {
         </ol>
       </Card>
 
+      {isMur && installments.length > 0 && (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Your repayment schedule</h2>
+            <div className="text-xs text-muted-foreground">{paidCount}/{installments.length} paid · received {formatMoney(receivedSoFar)} of {formatMoney(myMur?.totalReceive ?? 0)}</div>
+          </div>
+          <div className="divide-y rounded-md border max-h-72 overflow-auto">
+            {installments.map((x) => {
+              const yours = Number(x.total_amount) * share;
+              return (
+                <div key={x.id} className="flex items-center justify-between p-2.5 text-sm">
+                  <div>
+                    <div className="font-medium">#{x.seq} · {new Date(x.due_date).toLocaleDateString()}</div>
+                    <div className="text-[11px] text-muted-foreground">Your slice: {formatMoney(yours)}</div>
+                  </div>
+                  <Badge variant={x.status === "paid" ? "default" : "outline"} className={x.status === "paid" ? "bg-primary text-primary-foreground" : ""}>
+                    {x.status}
+                  </Badge>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <Card className="p-4 space-y-2 text-sm">
-        <div className="flex justify-between"><span className="text-muted-foreground">SME confirmed equity transfer</span><span>{inv.sme_confirmed_equity ? "✓" : "—"}</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground">Investor confirmed receipt</span><span>{inv.investor_confirmed_receipt ? "✓" : "—"}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">{isMur ? "SME confirmed asset delivery" : "SME confirmed equity transfer"}</span><span>{inv.sme_confirmed_equity ? "✓" : "—"}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">{isMur ? "Investor acknowledged purchase" : "Investor confirmed receipt"}</span><span>{inv.investor_confirmed_receipt ? "✓" : "—"}</span></div>
         {inv.deadline && <div className="flex justify-between"><span className="text-muted-foreground">Deadline</span><span>{new Date(inv.deadline).toLocaleDateString()}</span></div>}
       </Card>
 
       {isInvestor && inv.status === "funds_in_escrow" && !inv.investor_confirmed_receipt && (
-        <Button className="w-full" onClick={confirmReceipt}>Confirm equity received</Button>
+        <Button className="w-full" onClick={confirmReceipt}>{isMur ? "Acknowledge asset purchase" : "Confirm equity received"}</Button>
       )}
       {isInvestor && inv.status === "equity_confirmed" && (
         <Button className="w-full" onClick={release}>Release funds to SME (minus 3% fee)</Button>

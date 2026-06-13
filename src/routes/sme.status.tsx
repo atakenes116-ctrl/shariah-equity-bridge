@@ -18,6 +18,7 @@ function StatusPage() {
   const { user } = useAuth();
   const [deals, setDeals] = useState<any[]>([]);
   const [invByDeal, setInvByDeal] = useState<Record<string, any[]>>({});
+  const [insByDeal, setInsByDeal] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -29,6 +30,13 @@ function StatusPage() {
       const grouped: Record<string, any[]> = {};
       (invs ?? []).forEach((i: any) => { (grouped[i.deal_id] ||= []).push(i); });
       setInvByDeal(grouped);
+      const murIds = ds.filter((d: any) => d.deal_type === "murabaha").map((d: any) => d.id);
+      if (murIds.length) {
+        const { data: ins } = await supabase.from("installments").select("*").in("deal_id", murIds).order("seq");
+        const g2: Record<string, any[]> = {};
+        (ins ?? []).forEach((x: any) => { (g2[x.deal_id] ||= []).push(x); });
+        setInsByDeal(g2);
+      }
     }
     setLoading(false);
   }
@@ -45,6 +53,13 @@ function StatusPage() {
     load();
   }
 
+  async function markPaid(insId: string) {
+    const { error } = await supabase.from("installments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", insId);
+    if (error) return toast.error(error.message);
+    toast.success("Installment marked paid");
+    load();
+  }
+
   if (loading) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
   return (
@@ -58,24 +73,34 @@ function StatusPage() {
       )}
       <div className="space-y-4">
         {deals.map((d) => {
+          const isMur = d.deal_type === "murabaha";
           const raised = Number(d.funded_amount ?? 0);
           const pct = Math.min(100, Math.round((raised / d.amount_requested) * 100));
           const invs = invByDeal[d.id] ?? [];
           const equityAllocated = invs.reduce((s, i) => s + Number(i.equity_percent ?? 0), 0);
+          const ins = insByDeal[d.id] ?? [];
+          const paid = ins.filter((x) => x.status === "paid").length;
+          const repayPct = ins.length ? Math.round((paid / ins.length) * 100) : 0;
           return (
             <Card key={d.id} className="p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="font-semibold text-lg">{d.sme_name}</h2>
+                    <Badge variant="outline">{isMur ? "Murabaha" : "Equity"}</Badge>
                     <Badge variant="outline">{statusLabel(d.status)}</Badge>
                     {d.shariah_status === "compliant" && d.status !== "under_review" && (
                       <Badge className="bg-primary text-primary-foreground">Shariah-compliant</Badge>
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    Seeking {formatMoney(d.amount_requested)} for {d.equity_offered}% equity · min ticket {formatMoney(d.min_investment ?? 0)} · {d.sector} · {d.country}
+                    {isMur
+                      ? <>Asset {formatMoney(d.amount_requested)} · {d.tenor_months}mo at {((d.profit_rate ?? 0)*100).toFixed(0)}% profit · min ticket {formatMoney(d.min_investment ?? 0)} · {d.sector} · {d.country}</>
+                      : <>Seeking {formatMoney(d.amount_requested)} for {d.equity_offered}% equity · min ticket {formatMoney(d.min_investment ?? 0)} · {d.sector} · {d.country}</>}
                   </div>
+                  {isMur && d.asset_name && (
+                    <div className="text-xs text-muted-foreground mt-0.5"><b>{d.asset_name}</b>{d.asset_supplier ? ` · ${d.asset_supplier}` : ""}</div>
+                  )}
                 </div>
               </div>
 
@@ -84,7 +109,7 @@ function StatusPage() {
                   <Progress value={pct} className="h-2" />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{formatMoney(raised)} raised · {pct}%</span>
-                    <span>{equityAllocated.toFixed(2)}% equity allocated</span>
+                    <span>{isMur ? `${paid}/${ins.length || d.tenor_months || "—"} installments paid` : `${equityAllocated.toFixed(2)}% equity allocated`}</span>
                   </div>
                 </div>
               )}
@@ -98,13 +123,42 @@ function StatusPage() {
                     {invs.map((i) => (
                       <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
                         <div className="text-sm">
-                          <div className="font-medium">{formatMoney(i.amount)} · {Number(i.equity_percent).toFixed(2)}% equity</div>
+                          <div className="font-medium">
+                            {formatMoney(i.amount)} · {isMur
+                              ? `${Number(i.share_percent ?? 0).toFixed(2)}% share`
+                              : `${Number(i.equity_percent ?? 0).toFixed(2)}% equity`}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {statusLabel(i.status)} · receipt {i.investor_confirmed_receipt ? "✓" : "—"} · equity {i.sme_confirmed_equity ? "✓" : "—"}
                           </div>
                         </div>
                         {i.status === "funds_in_escrow" && !i.sme_confirmed_equity && (
-                          <Button size="sm" onClick={() => confirmEquity(i.id)}>Mark equity issued</Button>
+                          <Button size="sm" onClick={() => confirmEquity(i.id)}>{isMur ? "Mark asset delivered" : "Mark equity issued"}</Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isMur && ins.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium">Repayment schedule</h3>
+                    <div className="text-xs text-muted-foreground">{paid}/{ins.length} paid ({repayPct}%)</div>
+                  </div>
+                  <Progress value={repayPct} className="h-2 mb-2" />
+                  <div className="divide-y rounded-md border max-h-72 overflow-auto">
+                    {ins.map((x) => (
+                      <div key={x.id} className="flex items-center justify-between p-2.5 text-sm">
+                        <div>
+                          <div className="font-medium">#{x.seq} · due {new Date(x.due_date).toLocaleDateString()}</div>
+                          <div className="text-[11px] text-muted-foreground">{formatMoney(Number(x.total_amount))}{x.paid_at ? ` · paid ${new Date(x.paid_at).toLocaleDateString()}` : ""}</div>
+                        </div>
+                        {x.status === "paid" ? (
+                          <Badge className="bg-primary text-primary-foreground">paid</Badge>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => markPaid(x.id)}>Mark paid</Button>
                         )}
                       </div>
                     ))}

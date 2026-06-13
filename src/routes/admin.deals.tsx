@@ -27,6 +27,7 @@ function statusBadge(status: string) {
 function DealsProgress() {
   const [deals, setDeals] = useState<any[]>([]);
   const [invByDeal, setInvByDeal] = useState<Record<string, any[]>>({});
+  const [insByDeal, setInsByDeal] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +39,13 @@ function DealsProgress() {
         const g: Record<string, any[]> = {};
         (invs ?? []).forEach((i: any) => { (g[i.deal_id] ||= []).push(i); });
         setInvByDeal(g);
+        const murIds = ds.filter((d: any) => d.deal_type === "murabaha").map((d: any) => d.id);
+        if (murIds.length) {
+          const { data: ins } = await supabase.from("installments").select("*").in("deal_id", murIds).order("seq");
+          const g2: Record<string, any[]> = {};
+          (ins ?? []).forEach((x: any) => { (g2[x.deal_id] ||= []).push(x); });
+          setInsByDeal(g2);
+        }
       }
       setLoading(false);
     })();
@@ -69,10 +77,14 @@ function DealsProgress() {
 
       <div className="space-y-4">
         {deals.map((d) => {
+          const isMur = d.deal_type === "murabaha";
           const raised = Number(d.funded_amount ?? 0);
           const pct = Math.min(100, Math.round((raised / d.amount_requested) * 100));
           const invs = invByDeal[d.id] ?? [];
           const equityAllocated = invs.reduce((s, i) => s + Number(i.equity_percent ?? 0), 0);
+          const ins = insByDeal[d.id] ?? [];
+          const paid = ins.filter((x) => x.status === "paid").length;
+          const repayPct = ins.length ? Math.round((paid / ins.length) * 100) : 0;
           const failed = d.status === "rejected" || d.status === "refunded";
           return (
             <Card key={d.id} className="p-5 space-y-4">
@@ -80,13 +92,20 @@ function DealsProgress() {
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="font-semibold">{d.sme_name}</div>
+                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-secondary">{isMur ? "Murabaha" : "Equity"}</span>
                     {statusBadge(d.status)}
                   </div>
-                  <div className="text-xs text-muted-foreground">{d.sector} · {d.country} · seeking {formatMoney(d.amount_requested)} for {d.equity_offered}%</div>
+                  <div className="text-xs text-muted-foreground">
+                    {d.sector} · {d.country} · {isMur
+                      ? <>asset {formatMoney(d.amount_requested)} · {d.tenor_months}mo · {((d.profit_rate ?? 0)*100).toFixed(0)}%</>
+                      : <>seeking {formatMoney(d.amount_requested)} for {d.equity_offered}%</>}
+                  </div>
                 </div>
                 <div className="text-right text-sm">
                   <div className="font-medium">{formatMoney(raised)} / {formatMoney(d.amount_requested)}</div>
-                  <div className="text-xs text-muted-foreground">{equityAllocated.toFixed(2)}% equity allocated</div>
+                  <div className="text-xs text-muted-foreground">
+                    {isMur ? `${paid}/${ins.length || d.tenor_months || "—"} installments paid` : `${equityAllocated.toFixed(2)}% equity allocated`}
+                  </div>
                 </div>
               </div>
 
@@ -95,9 +114,17 @@ function DealsProgress() {
               ) : d.status === "under_review" ? (
                 <div className="text-sm text-muted-foreground">Awaiting admin review.</div>
               ) : (
-                <div className="space-y-1.5">
-                  <Progress value={pct} className="h-2" />
-                  <div className="text-[11px] text-muted-foreground">{pct}% funded</div>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Progress value={pct} className="h-2" />
+                    <div className="text-[11px] text-muted-foreground">{pct}% funded</div>
+                  </div>
+                  {isMur && (
+                    <div className="space-y-1.5">
+                      <Progress value={repayPct} className="h-2" />
+                      <div className="text-[11px] text-muted-foreground">{repayPct}% repaid ({paid}/{ins.length || "—"})</div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -106,7 +133,9 @@ function DealsProgress() {
                   {invs.map((i) => (
                     <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
                       <div>
-                        <div className="font-medium">{formatMoney(i.amount)} · {Number(i.equity_percent).toFixed(2)}%</div>
+                        <div className="font-medium">{formatMoney(i.amount)} · {isMur
+                          ? `${Number(i.share_percent ?? 0).toFixed(2)}% share`
+                          : `${Number(i.equity_percent ?? 0).toFixed(2)}% equity`}</div>
                         <div className="text-xs text-muted-foreground">
                           Investor {i.investor_id.slice(0, 8)}… · funded {new Date(i.funded_at).toLocaleDateString()}
                         </div>

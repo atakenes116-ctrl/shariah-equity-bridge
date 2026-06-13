@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { formatMoney } from "@/lib/screening";
+import { computeMurabaha, investorMonthly } from "@/lib/murabaha";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
@@ -46,12 +47,15 @@ function DealDetail() {
     if (amount > wallet) return toast.error("Insufficient wallet balance");
     setFunding(true);
     try {
-      const { data: inv, error } = await supabase.from("investments").insert({
+      const payload: any = {
         deal_id: id,
         investor_id: user.id,
         amount,
-        equity_percent: (amount / d.amount_requested) * d.equity_offered, // trigger overrides, kept for client-side typing
-      }).select().maybeSingle();
+      };
+      if (d.deal_type !== "murabaha") {
+        payload.equity_percent = (amount / d.amount_requested) * (d.equity_offered ?? 0);
+      }
+      const { data: inv, error } = await supabase.from("investments").insert(payload).select().maybeSingle();
       if (error) throw error;
       await supabase.from("profiles").update({ wallet_balance: wallet - amount }).eq("id", user.id);
       toast.success("Funds placed in escrow");
@@ -62,13 +66,16 @@ function DealDetail() {
   }
 
   if (!d) return <div className="text-sm text-muted-foreground">Loading…</div>;
-  const valuation = d.amount_requested / (d.equity_offered / 100);
+  const isMur = d.deal_type === "murabaha";
+  const valuation = !isMur && d.equity_offered ? d.amount_requested / (d.equity_offered / 100) : 0;
   const raised = Number(d.funded_amount ?? 0);
   const remaining = Math.max(0, d.amount_requested - raised);
   const pctRaised = Math.round((raised / d.amount_requested) * 100);
   const minTicket = Number(d.min_investment ?? 0);
-  const myEquity = d.amount_requested > 0 ? (amount / d.amount_requested) * d.equity_offered : 0;
+  const myEquity = !isMur && d.amount_requested > 0 ? (amount / d.amount_requested) * (d.equity_offered ?? 0) : 0;
   const sliderMax = Math.max(minTicket, remaining);
+  const mur = isMur ? computeMurabaha(d.amount_requested, d.tenor_months ?? 0) : null;
+  const myMur = isMur ? investorMonthly(amount, d.amount_requested, d.tenor_months ?? 0) : null;
 
   return (
     <div className="space-y-4">
@@ -76,6 +83,7 @@ function DealDetail() {
       <div>
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-xl font-semibold">{d.sme_name}</h1>
+          <Badge variant="outline">{isMur ? "Murabaha" : "Equity"}</Badge>
           <Badge className="bg-primary text-primary-foreground">Shariah-compliant</Badge>
         </div>
         <div className="text-sm text-muted-foreground">{d.sector} · {d.country} · {d.years_in_operation}y in operation</div>
@@ -84,8 +92,17 @@ function DealDetail() {
       <Card className="p-4">
         <div className="grid grid-cols-3 gap-2 text-center">
           <Stat label="Capital" value={formatMoney(d.amount_requested)} />
-          <Stat label="Equity" value={`${d.equity_offered}%`} />
-          <Stat label="Valuation" value={formatMoney(valuation)} />
+          {isMur ? (
+            <>
+              <Stat label="Profit" value={`${((mur?.rate ?? 0)*100).toFixed(0)}%`} />
+              <Stat label="Tenor" value={`${d.tenor_months}mo`} />
+            </>
+          ) : (
+            <>
+              <Stat label="Equity" value={`${d.equity_offered}%`} />
+              <Stat label="Valuation" value={formatMoney(valuation)} />
+            </>
+          )}
         </div>
         <div className="mt-4 space-y-1.5">
           <Progress value={Math.min(100, pctRaised)} className="h-2" />
@@ -96,20 +113,39 @@ function DealDetail() {
         </div>
       </Card>
 
-      <Card className="p-4 space-y-2">
-        <h2 className="font-medium">Terms (musharakah)</h2>
-        <p className="text-sm text-muted-foreground">
-          You join a partnership in {d.sme_name}, taking a <b>proportional equity stake</b> based on your ticket.
-          Returns are profit-and-loss shared in proportion to equity held.
-          This is a true partnership — there is no fixed or guaranteed return.
-        </p>
-        <ul className="text-sm space-y-1 mt-2">
-          <li>· Total round: {formatMoney(d.amount_requested)} for {d.equity_offered}% equity</li>
-          <li>· Minimum ticket: {formatMoney(minTicket)}</li>
-          <li>· Implied valuation: {formatMoney(valuation)}</li>
-          <li>· Platform service fee: 3% on release</li>
-        </ul>
-      </Card>
+      {isMur ? (
+        <Card className="p-4 space-y-2">
+          <h2 className="font-medium">Terms (murabaha)</h2>
+          <p className="text-sm text-muted-foreground">
+            The platform purchases <b>{d.asset_name}</b> from {d.asset_supplier} on behalf of {d.sme_name}.
+            The SME repays cost + {((mur?.rate ?? 0)*100).toFixed(0)}% profit in {d.tenor_months} equal monthly installments.
+            No equity changes hands. Profit is fixed at the start — this is a sale, not a loan.
+          </p>
+          {d.asset_description && <p className="text-sm text-muted-foreground"><b>Asset:</b> {d.asset_description}</p>}
+          <ul className="text-sm space-y-1 mt-2">
+            <li>· Asset cost: {formatMoney(d.amount_requested)}</li>
+            <li>· Total profit: {formatMoney(mur?.profit ?? 0)} ({((mur?.rate ?? 0)*100).toFixed(0)}%)</li>
+            <li>· Total repayable: {formatMoney(mur?.total ?? 0)} over {d.tenor_months} months</li>
+            <li>· Monthly installment (whole deal): {formatMoney(mur?.monthly ?? 0)}</li>
+            <li>· Minimum ticket: {formatMoney(minTicket)}</li>
+          </ul>
+        </Card>
+      ) : (
+        <Card className="p-4 space-y-2">
+          <h2 className="font-medium">Terms (musharakah)</h2>
+          <p className="text-sm text-muted-foreground">
+            You join a partnership in {d.sme_name}, taking a <b>proportional equity stake</b> based on your ticket.
+            Returns are profit-and-loss shared in proportion to equity held.
+            This is a true partnership — there is no fixed or guaranteed return.
+          </p>
+          <ul className="text-sm space-y-1 mt-2">
+            <li>· Total round: {formatMoney(d.amount_requested)} for {d.equity_offered}% equity</li>
+            <li>· Minimum ticket: {formatMoney(minTicket)}</li>
+            <li>· Implied valuation: {formatMoney(valuation)}</li>
+            <li>· Platform service fee: 3% on release</li>
+          </ul>
+        </Card>
+      )}
 
       <Card className="p-4 space-y-2">
         <h2 className="font-medium">Shariah review</h2>
@@ -158,10 +194,23 @@ function DealDetail() {
               onValueChange={(v) => setAmount(v[0])}
             />
           )}
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <Stat label="You pay" value={formatMoney(amount)} />
-            <Stat label="Equity you receive" value={`${myEquity.toFixed(2)}%`} />
-          </div>
+          {isMur ? (
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <Stat label="You pay" value={formatMoney(amount)} />
+              <Stat label="Monthly receivable" value={formatMoney(myMur?.monthly ?? 0)} />
+              <Stat label="Total received" value={formatMoney(myMur?.totalReceive ?? 0)} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <Stat label="You pay" value={formatMoney(amount)} />
+              <Stat label="Equity you receive" value={`${myEquity.toFixed(2)}%`} />
+            </div>
+          )}
+          {isMur && (
+            <p className="text-[11px] text-muted-foreground">
+              Profit on your ticket: {formatMoney(myMur?.profit ?? 0)} over {d.tenor_months} months.
+            </p>
+          )}
           <p className="text-[11px] text-muted-foreground">
             Min {formatMoney(minTicket)} · Max remaining {formatMoney(remaining)}.
           </p>

@@ -21,13 +21,15 @@ export type DealLike = {
   interest_income: number;
   bank_statements_file?: string | null;
   financial_statements_file?: string | null;
+  deal_type?: "musharakah" | "murabaha";
 };
 
 export function computeFlags(d: DealLike): Flag[] {
   const flags: Flag[] = [];
 
   const complete = !!d.bank_statements_file && !!d.financial_statements_file
-    && d.amount_requested > 0 && d.equity_offered > 0 && d.sector;
+    && d.amount_requested > 0 && d.sector
+    && (d.deal_type === "murabaha" || d.equity_offered > 0);
   flags.push({
     code: "completeness",
     severity: complete ? "pass" : "warn",
@@ -67,16 +69,28 @@ export function computeFlags(d: DealLike): Flag[] {
       : "Annual revenue under €25k or less than 1 year in operation.",
   });
 
-  const valuation = d.equity_offered > 0 ? d.amount_requested / (d.equity_offered / 100) : 0;
-  const valSane = d.revenue > 0 ? valuation <= 15 * d.revenue : false;
-  flags.push({
-    code: "valuation",
-    severity: valSane ? "pass" : "warn",
-    label: "Valuation sanity",
-    detail: valSane
-      ? `Implied valuation €${Math.round(valuation).toLocaleString()} ≤ 15× revenue.`
-      : `Implied valuation €${Math.round(valuation).toLocaleString()} exceeds 15× revenue €${Math.round(d.revenue).toLocaleString()}.`,
-  });
+  if (d.deal_type === "murabaha") {
+    const sane = d.amount_requested > 0 && d.amount_requested <= Math.max(d.revenue, d.total_assets);
+    flags.push({
+      code: "valuation",
+      severity: sane ? "pass" : "warn",
+      label: "Asset cost sanity",
+      detail: sane
+        ? `Asset cost €${Math.round(d.amount_requested).toLocaleString()} is reasonable vs. revenue/assets.`
+        : `Asset cost €${Math.round(d.amount_requested).toLocaleString()} exceeds revenue €${Math.round(d.revenue).toLocaleString()} and total assets €${Math.round(d.total_assets).toLocaleString()}.`,
+    });
+  } else {
+    const valuation = d.equity_offered > 0 ? d.amount_requested / (d.equity_offered / 100) : 0;
+    const valSane = d.revenue > 0 ? valuation <= 15 * d.revenue : false;
+    flags.push({
+      code: "valuation",
+      severity: valSane ? "pass" : "warn",
+      label: "Valuation sanity",
+      detail: valSane
+        ? `Implied valuation €${Math.round(valuation).toLocaleString()} ≤ 15× revenue.`
+        : `Implied valuation €${Math.round(valuation).toLocaleString()} exceeds 15× revenue €${Math.round(d.revenue).toLocaleString()}.`,
+    });
+  }
 
   return flags;
 }

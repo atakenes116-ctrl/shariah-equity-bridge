@@ -23,7 +23,7 @@ function Portfolio() {
       const list = invs ?? [];
       if (list.length === 0) { setRows([]); return; }
       const dealIds = Array.from(new Set(list.map((i: any) => i.deal_id)));
-      const { data: deals } = await supabase.from("deals").select("id,sme_name,sector,country").in("id", dealIds);
+      const { data: deals } = await supabase.from("deals").select("id,sme_name,sector,country,deal_type,tenor_months,amount_requested").in("id", dealIds);
       const byId = new Map((deals ?? []).map((d: any) => [d.id, d]));
       setRows(list.map((i: any) => ({ ...i, deal: byId.get(i.deal_id) })));
     })();
@@ -42,10 +42,13 @@ function Portfolio() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-semibold">{i.deal?.sme_name ?? "—"}</h2>
+                  {i.deal && <Badge variant="outline">{i.deal.deal_type === "murabaha" ? "Murabaha" : "Equity"}</Badge>}
                   <Badge variant="outline">{i.status.replace(/_/g, " ")}</Badge>
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {formatMoney(i.amount)} · {Number(i.equity_percent).toFixed(2)}% equity
+                  {formatMoney(i.amount)} · {i.deal?.deal_type === "murabaha"
+                    ? `${Number(i.share_percent ?? 0).toFixed(2)}% share · ${i.deal?.tenor_months ?? "?"}mo`
+                    : `${Number(i.equity_percent ?? 0).toFixed(2)}% equity`}
                 </div>
                 {i.deal && <div className="text-[11px] text-muted-foreground">{i.deal.sector} · {i.deal.country}</div>}
               </div>

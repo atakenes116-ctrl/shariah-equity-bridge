@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { formatMoney } from "@/lib/screening";
+import { computeMurabaha } from "@/lib/murabaha";
 import { ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/investor/")({ component: Marketplace });
@@ -30,7 +31,9 @@ function Marketplace() {
         <Card className="p-6 text-center text-sm text-muted-foreground">No live deals right now — check back soon.</Card>
       )}
       {deals.map((d) => {
-        const valuation = d.amount_requested / (d.equity_offered / 100);
+        const isMur = d.deal_type === "murabaha";
+        const valuation = !isMur && d.equity_offered ? d.amount_requested / (d.equity_offered / 100) : 0;
+        const mur = isMur ? computeMurabaha(d.amount_requested, d.tenor_months ?? 0) : null;
         const raised = Number(d.funded_amount ?? 0);
         const pct = Math.min(100, Math.round((raised / d.amount_requested) * 100));
         const remaining = Math.max(0, d.amount_requested - raised);
@@ -41,6 +44,7 @@ function Marketplace() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="font-semibold truncate">{d.sme_name}</h2>
+                    <Badge variant="outline">{isMur ? "Murabaha" : "Equity"}</Badge>
                     <Badge className="bg-primary text-primary-foreground">Shariah-compliant</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">{d.sector} · {d.country}</div>
@@ -49,8 +53,17 @@ function Marketplace() {
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <Stat label="Capital" value={formatMoney(d.amount_requested)} />
-                <Stat label="Equity" value={`${d.equity_offered}%`} />
-                <Stat label="Valuation" value={formatMoney(valuation)} />
+                {isMur ? (
+                  <>
+                    <Stat label="Profit" value={`${((mur?.rate ?? 0)*100).toFixed(0)}%`} />
+                    <Stat label="Tenor" value={`${d.tenor_months}mo`} />
+                  </>
+                ) : (
+                  <>
+                    <Stat label="Equity" value={`${d.equity_offered}%`} />
+                    <Stat label="Valuation" value={formatMoney(valuation)} />
+                  </>
+                )}
               </div>
               <div className="mt-3 space-y-1.5">
                 <Progress value={pct} className="h-2" />
