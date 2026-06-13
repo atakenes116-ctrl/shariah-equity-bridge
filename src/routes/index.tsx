@@ -48,7 +48,7 @@ function Landing() {
         </div>
         <Button variant="outline" size="sm" onClick={async () => {
           setSeeding(true);
-          try { await seed({ data: undefined as never }); toast.success("Demo accounts ready"); }
+          try { await seed(); toast.success("Demo accounts ready"); }
           catch (e: any) { toast.error(e.message ?? "Seed failed"); }
           finally { setSeeding(false); }
         }} disabled={seeding}>{seeding ? "Seeding…" : "Seed demo data"}</Button>
