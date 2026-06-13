@@ -98,7 +98,45 @@ export const seedDemoData = createServerFn({ method: "POST" }).handler(async () 
     ],
   };
 
-  await supabaseAdmin.from("deals").insert([cleanDeal, flaggedDeal]);
+  // Deal 3: approved Murabaha — CNC machine for the same SME
+  const murabahaDeal = {
+    sme_id: ids.sme,
+    sme_name: "Barakah Organic Foods",
+    sector: "Manufacturing",
+    country: "Netherlands",
+    years_in_operation: 4,
+    deal_type: "murabaha" as const,
+    amount_requested: 40000,
+    equity_offered: null,
+    min_investment: 5000,
+    asset_name: "Refrigerated delivery van",
+    asset_description: "Iveco Daily 35S14 with insulated body and dual-zone cooling. Extends cold-chain coverage by ~250km/day.",
+    asset_supplier: "Iveco Nederland B.V.",
+    tenor_months: 12,
+    profit_rate: 0.08,
+    total_repayable: 43200,
+    use_of_funds: "Purchase a refrigerated delivery van to expand cold-chain logistics.",
+    pitch: "Profitable B2B distributor financing fleet expansion via Murabaha. Asset is critical to growing route density.",
+    revenue: 300000,
+    net_profit: 48000,
+    total_assets: 180000,
+    interest_bearing_debt: 0,
+    interest_income: 0,
+    bank_statements_file: "seed/mur_bank.pdf",
+    financial_statements_file: "seed/mur_fs.pdf",
+    shariah_status: "compliant",
+    status: "approved" as const,
+    reviewed_by: ids.admin,
+    flags: [
+      { code: "completeness", severity: "pass", label: "Completeness", detail: "All required fields and documents present." },
+      { code: "sector", severity: "pass", label: "Shariah sector screen", detail: "Sector is permissible." },
+      { code: "financial", severity: "pass", label: "Shariah financial screen", detail: "Debt/assets 0%, interest income/revenue 0% — within limits." },
+      { code: "eligibility", severity: "pass", label: "Eligibility", detail: "Meets minimum revenue and operating history." },
+      { code: "valuation", severity: "pass", label: "Asset cost sanity", detail: "Asset cost €40,000 is reasonable vs. revenue/assets." },
+    ],
+  };
+
+  await supabaseAdmin.from("deals").insert([cleanDeal, flaggedDeal, murabahaDeal]);
 
   return { ok: true, accounts: demos.map(d => ({ email: d.email, password: d.password, role: d.role })) };
 });
