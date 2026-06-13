@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SmeRouteImport } from './routes/sme'
+import { Route as InvestorRouteImport } from './routes/investor'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InvestorIndexRouteImport } from './routes/investor.index'
 import { Route as SmeStatusRouteImport } from './routes/sme.status'
 import { Route as SmeApplyRouteImport } from './routes/sme.apply'
 
@@ -19,10 +21,20 @@ const SmeRoute = SmeRouteImport.update({
   path: '/sme',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvestorRoute = InvestorRouteImport.update({
+  id: '/investor',
+  path: '/investor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const InvestorIndexRoute = InvestorIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InvestorRoute,
 } as any)
 const SmeStatusRoute = SmeStatusRouteImport.update({
   id: '/status',
@@ -37,33 +49,52 @@ const SmeApplyRoute = SmeApplyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/investor': typeof InvestorRouteWithChildren
   '/sme': typeof SmeRouteWithChildren
   '/sme/apply': typeof SmeApplyRoute
   '/sme/status': typeof SmeStatusRoute
+  '/investor/': typeof InvestorIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sme': typeof SmeRouteWithChildren
   '/sme/apply': typeof SmeApplyRoute
   '/sme/status': typeof SmeStatusRoute
+  '/investor': typeof InvestorIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/investor': typeof InvestorRouteWithChildren
   '/sme': typeof SmeRouteWithChildren
   '/sme/apply': typeof SmeApplyRoute
   '/sme/status': typeof SmeStatusRoute
+  '/investor/': typeof InvestorIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sme' | '/sme/apply' | '/sme/status'
+  fullPaths:
+    | '/'
+    | '/investor'
+    | '/sme'
+    | '/sme/apply'
+    | '/sme/status'
+    | '/investor/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sme' | '/sme/apply' | '/sme/status'
-  id: '__root__' | '/' | '/sme' | '/sme/apply' | '/sme/status'
+  to: '/' | '/sme' | '/sme/apply' | '/sme/status' | '/investor'
+  id:
+    | '__root__'
+    | '/'
+    | '/investor'
+    | '/sme'
+    | '/sme/apply'
+    | '/sme/status'
+    | '/investor/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InvestorRoute: typeof InvestorRouteWithChildren
   SmeRoute: typeof SmeRouteWithChildren
 }
 
@@ -76,12 +107,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SmeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/investor': {
+      id: '/investor'
+      path: '/investor'
+      fullPath: '/investor'
+      preLoaderRoute: typeof InvestorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/investor/': {
+      id: '/investor/'
+      path: '/'
+      fullPath: '/investor/'
+      preLoaderRoute: typeof InvestorIndexRouteImport
+      parentRoute: typeof InvestorRoute
     }
     '/sme/status': {
       id: '/sme/status'
@@ -100,6 +145,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface InvestorRouteChildren {
+  InvestorIndexRoute: typeof InvestorIndexRoute
+}
+
+const InvestorRouteChildren: InvestorRouteChildren = {
+  InvestorIndexRoute: InvestorIndexRoute,
+}
+
+const InvestorRouteWithChildren = InvestorRoute._addFileChildren(
+  InvestorRouteChildren,
+)
+
 interface SmeRouteChildren {
   SmeApplyRoute: typeof SmeApplyRoute
   SmeStatusRoute: typeof SmeStatusRoute
@@ -114,6 +171,7 @@ const SmeRouteWithChildren = SmeRoute._addFileChildren(SmeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InvestorRoute: InvestorRouteWithChildren,
   SmeRoute: SmeRouteWithChildren,
 }
 export const routeTree = rootRouteImport
