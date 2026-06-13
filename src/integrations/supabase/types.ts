@@ -211,6 +211,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_has_investment_in_deal: {
+        Args: { _deal_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "sme" | "investor" | "admin"
