@@ -23,6 +23,7 @@ function ApplyPage() {
     years_in_operation: 1,
     amount_requested: 50000,
     equity_offered: 10,
+    min_investment: 12500,
     use_of_funds: "",
     pitch: "",
     revenue: 0, net_profit: 0, total_assets: 0,
@@ -35,7 +36,8 @@ function ApplyPage() {
   function upd<K extends keyof typeof f>(k: K, v: (typeof f)[K]) { setF((s) => ({ ...s, [k]: v })); }
 
   const required = f.sme_name && f.sector && f.country && f.amount_requested > 0 && f.equity_offered > 0
-    && f.use_of_funds && f.pitch && bank && fs;
+    && f.use_of_funds && f.pitch && bank && fs
+    && f.min_investment > 0 && f.min_investment <= f.amount_requested;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,6 +91,13 @@ function ApplyPage() {
         <div><Label>Years in operation</Label><Input type="number" min={0} value={f.years_in_operation} onChange={e=>upd("years_in_operation",+e.target.value)} /></div>
         <div><Label>Capital requested (€)</Label><Input type="number" min={0} value={f.amount_requested} onChange={e=>upd("amount_requested",+e.target.value)} /></div>
         <div><Label>Equity offered (%)</Label><Input type="number" min={0} max={100} value={f.equity_offered} onChange={e=>upd("equity_offered",+e.target.value)} /></div>
+        <div className="md:col-span-2">
+          <Label>Minimum investment per investor (€)</Label>
+          <Input type="number" min={1} max={f.amount_requested} value={f.min_investment} onChange={e=>upd("min_investment",+e.target.value)} />
+          <p className="text-xs text-muted-foreground mt-1">
+            Controls how many investors can join. Lower ticket = more investors. E.g. €{Math.max(1, Math.floor(f.amount_requested / Math.max(1, f.min_investment)))} max investors.
+          </p>
+        </div>
         <div className="md:col-span-2"><Label>Use of funds</Label><Textarea value={f.use_of_funds} onChange={e=>upd("use_of_funds",e.target.value)} required /></div>
         <div className="md:col-span-2"><Label>Short pitch</Label><Textarea value={f.pitch} onChange={e=>upd("pitch",e.target.value)} required /></div>
       </Card>
